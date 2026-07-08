@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Minder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <section id="login-screen" class="screen">
+            <div class="center-content">
+                <img src="logo.png" alt="Food Minder Logo" class="main-logo">
+                <div class="login-box">
+                    <h2>Log In</h2>
+                    <input type="email" id="login-email" placeholder="Enter email...">
+                    <input type="password" id="login-password" placeholder="Enter password...">
+                    <button id="login-confirm-btn" class="btn-primary">LOG IN</button>
+                    <p class="secondary-link">FORGOT PASSWORD?</p>
+                    <p class="secondary-link" id="show-signup-link">SIGNUP</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="signup-screen" class="screen hidden">
+            <div class="center-content">
+                <img src="logo.png" alt="Food Minder Logo" class="main-logo">
+                <div class="login-box">
+                    <h2>Sign Up</h2>
+                    <input type="text" id="signup-name" placeholder="Enter full name...">
+                    <input type="email" id="signup-email" placeholder="Enter email...">
+                    <input type="password" id="signup-password" placeholder="Enter password (6+ characters)...">
+                    <button id="signup-confirm-btn" class="btn-primary">SIGN UP</button>
+                    <p class="secondary-link" id="show-login-link">ALREADY HAVE AN ACCOUNT?</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="home-screen" class="screen hidden">
+            <header class="pantry-header">
+                <h1>My Pantry</h1>
+                <span id="logout-link" class="logout-link">Log Out</span>
+            </header>
+            <div id="pantry-groups">
+                <div class="category" id="group-dairy"><h3>Dairy</h3><div class="items"></div></div>
+                <div class="category" id="group-bakery"><h3>Bakery</h3><div class="items"></div></div>
+                <div class="category" id="group-meat"><h3>Meat & Fish</h3><div class="items"></div></div>
+                <div class="category" id="group-produce"><h3>Fresh Produce</h3><div class="items"></div></div>
+                <div class="category" id="group-pantry"><h3>Dry Goods</h3><div class="items"></div></div>
+                <div class="category" id="group-other"><h3>Other</h3><div class="items"></div></div>
+            </div>
+            <button id="scan-btn" class="fab">+</button>
+        </section>
+
+        <section id="scanner-screen" class="screen hidden">
+            <video id="video" width="100%" height="100%" playsinline></video>
+            <button id="close-scan" class="close-btn" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); padding:10px 20px;">Back</button>
+        </section>
+    </div>
+
+    <!-- Barcode scanner library -->
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+
+    <!-- Firebase libraries: these give us the Firestore database + a way to
+         quietly identify this device so its pantry data stays separate from
+         anyone else's. -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+
+    <!-- Your personal Firebase project keys (created in the setup steps) -->
+    <script src="firebase-config.js"></script>
+
+    <!-- App logic -->
+    <script src="script.js"></script>
+</body>
+</html>
