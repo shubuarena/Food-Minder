@@ -23,11 +23,26 @@ body {
 
 /* Specific to the Login Screen */
 #login-screen,
-#signup-screen {
+#signup-screen,
+#expiry-screen {
     background-color: var(--primary-teal);
     display: flex;
     justify-content: center;
     align-items: center; /* Centers everything perfectly */
+}
+
+/* NEW: item name + category shown above the date picker on the Confirm Expiry screen */
+.expiry-item-name {
+    font-weight: bold;
+    font-size: 18px;
+    margin: 0 0 4px 0;
+    color: #1F2937;
+}
+
+.expiry-item-category {
+    color: #6B7280;
+    margin: 0 0 20px 0;
+    font-size: 14px;
 }
 
 /* Container for logo + box */

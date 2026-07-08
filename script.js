@@ -22,7 +22,20 @@ const logoutLink = document.getElementById('logout-link');
 const scanBtn = document.getElementById('scan-btn');
 const closeScanBtn = document.getElementById('close-scan');
 
-// Estimated shelf lives (in days) per category
+const expiryScreen = document.getElementById('expiry-screen');
+const expiryItemNameLabel = document.getElementById('expiry-item-name');
+const expiryItemCategoryLabel = document.getElementById('expiry-item-category');
+const expiryDateInput = document.getElementById('expiry-date-input');
+const confirmExpiryBtn = document.getElementById('confirm-expiry-btn');
+const cancelExpiryLink = document.getElementById('cancel-expiry-link');
+
+// Holds the item that's waiting for the user to confirm its expiry date,
+// between when a barcode is scanned and when it actually gets saved.
+let pendingItem = null;
+
+// Estimated shelf lives (in days) per category - only used to pre-fill a
+// starting guess on the Confirm Expiry screen. The user can always change it
+// to the exact date printed on the package before saving.
 const shelfLifeMap = {
     "dairy": 7,
     "bakery": 4,
@@ -31,6 +44,58 @@ const shelfLifeMap = {
     "pantry": 180,
     "other": 10
 };
+
+// Friendly labels for the category shown on the Confirm Expiry screen
+const categoryLabels = {
+    "dairy": "Dairy",
+    "bakery": "Bakery",
+    "meat": "Meat & Fish",
+    "produce": "Fresh Produce",
+    "pantry": "Dry Goods",
+    "other": "Other"
+};
+
+// Turns a "days from now" number into a yyyy-mm-dd string, which is the
+// format the <input type="date"> field needs.
+function estimateExpiryDateString(matchedKey) {
+    const daysToAdd = shelfLifeMap[matchedKey] ?? shelfLifeMap["other"];
+    const d = new Date();
+    d.setDate(d.getDate() + daysToAdd);
+    return d.toISOString().split('T')[0];
+}
+
+// Shows the Confirm Expiry screen, pre-filled with a starting guess, and
+// remembers which item this is for until the user confirms or cancels.
+function openExpiryConfirmation(name, matchedKey) {
+    pendingItem = { name, matchedKey };
+    expiryItemNameLabel.textContent = name;
+    expiryItemCategoryLabel.textContent = categoryLabels[matchedKey] || "Other";
+    expiryDateInput.value = estimateExpiryDateString(matchedKey);
+    homeScreen.classList.add('hidden');
+    expiryScreen.classList.remove('hidden');
+}
+
+confirmExpiryBtn.addEventListener('click', () => {
+    if (!pendingItem) return;
+    const chosenDate = expiryDateInput.value;
+    if (!chosenDate) {
+        alert("Please choose an expiry date.");
+        return;
+    }
+    // Treat the chosen calendar date as local midnight, then store it as a
+    // full timestamp so it sorts/compares consistently in Firestore.
+    const chosenExpiryISO = new Date(chosenDate + 'T00:00:00').toISOString();
+    addItemToPantry(pendingItem.name, pendingItem.matchedKey, true, chosenExpiryISO);
+    pendingItem = null;
+    expiryScreen.classList.add('hidden');
+    homeScreen.classList.remove('hidden');
+});
+
+cancelExpiryLink.addEventListener('click', () => {
+    pendingItem = null;
+    expiryScreen.classList.add('hidden');
+    homeScreen.classList.remove('hidden');
+});
 
 // ============================================
 // FIREBASE SETUP (Firestore database + real accounts)
@@ -140,7 +205,8 @@ scanBtn.addEventListener('click', () => {
         if (result) {
             codeReader.reset();
             scannerScreen.classList.add('hidden');
-            homeScreen.classList.remove('hidden');
+            // Home screen stays hidden here - fetchProductFromAPI opens the
+            // Confirm Expiry screen once it knows what was scanned.
             fetchProductFromAPI(result.text);
         }
     });
@@ -164,13 +230,19 @@ async function fetchProductFromAPI(barcode) {
             const productName = data.product.product_name || "Unknown Item";
             const primaryCategory = data.product.categories_tags?.[0]?.toLowerCase() || "other";
             const matchedKey = matchCategory(primaryCategory);
-            addItemToPantry(productName, matchedKey, /* saveToDatabase */ true);
+            openExpiryConfirmation(productName, matchedKey);
         } else {
             const fallbackName = prompt("Product unrecognized. Enter name manually:");
-            if (fallbackName) addItemToPantry(fallbackName, "other", true);
+            if (fallbackName) {
+                openExpiryConfirmation(fallbackName, "other");
+            } else {
+                // User cancelled the prompt - just go back to the pantry.
+                homeScreen.classList.remove('hidden');
+            }
         }
     } catch (error) {
         console.error("API Fetch Error:", error);
+        homeScreen.classList.remove('hidden');
     }
 }
 

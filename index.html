@@ -56,6 +56,19 @@
             <video id="video" width="100%" height="100%" playsinline></video>
             <button id="close-scan" class="close-btn" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); padding:10px 20px;">Back</button>
         </section>
+
+        <section id="expiry-screen" class="screen hidden">
+            <div class="center-content">
+                <div class="login-box">
+                    <h2>Confirm Expiry</h2>
+                    <p id="expiry-item-name" class="expiry-item-name"></p>
+                    <p id="expiry-item-category" class="expiry-item-category"></p>
+                    <input type="date" id="expiry-date-input">
+                    <button id="confirm-expiry-btn" class="btn-primary">ADD TO PANTRY</button>
+                    <p class="secondary-link" id="cancel-expiry-link">CANCEL</p>
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- Barcode scanner library -->
