@@ -22,7 +22,8 @@ body {
 }
 
 /* Specific to the Login Screen */
-#login-screen {
+#login-screen,
+#signup-screen {
     background-color: var(--primary-teal);
     display: flex;
     justify-content: center;
