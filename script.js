@@ -29,6 +29,11 @@ const expiryDateInput = document.getElementById('expiry-date-input');
 const confirmExpiryBtn = document.getElementById('confirm-expiry-btn');
 const cancelExpiryLink = document.getElementById('cancel-expiry-link');
 
+const statsCountLabel = document.getElementById('stats-count');
+const statsMoneyLabel = document.getElementById('stats-money');
+const expiringItemsContainer = document.getElementById('expiring-items');
+const eatTodaySuggestionLabel = document.getElementById('eat-today-suggestion');
+
 // Holds the item that's waiting for the user to confirm its expiry date,
 // between when a barcode is scanned and when it actually gets saved.
 let pendingItem = null;
@@ -47,13 +52,169 @@ const shelfLifeMap = {
 
 // Friendly labels for the category shown on the Confirm Expiry screen
 const categoryLabels = {
-    "dairy": "Dairy",
-    "bakery": "Bakery",
-    "meat": "Meat & Fish",
-    "produce": "Fresh Produce",
-    "pantry": "Dry Goods",
-    "other": "Other"
+    "dairy": "🥛 Dairy",
+    "bakery": "🍞 Bakery",
+    "meat": "🍗 Meat & Fish",
+    "produce": "🥦 Fresh Produce",
+    "pantry": "🥫 Dry Goods",
+    "other": "🍽️ Other"
 };
+
+// Rough, made-up average value (in dollars) per item in each category, used
+// only to give a fun ballpark "money saved" figure - not meant to be exact.
+const estimatedValueMap = {
+    "dairy": 4,
+    "bakery": 3,
+    "meat": 8,
+    "produce": 3,
+    "pantry": 5,
+    "other": 4
+};
+
+// ============================================
+// SHARED STATE for the Expiring Soon panel + waste-saved stats
+// ============================================
+
+// Tracks every DOM node (an item can appear twice - once in its category,
+// once in the Expiring Soon panel) that belongs to each Firestore doc, so
+// "mark as used" can remove all of them together.
+let itemNodesByDocId = {};
+
+// The list of currently-visible "expiring within 3 days" items, used to
+// build the "what should we eat today" suggestion text.
+let expiringItemsInfo = [];
+
+// Running totals shown in the stats banner. Loaded from Firestore once at
+// login, then updated in memory (and in Firestore) each time something is
+// marked as used.
+let statsItemsSaved = 0;
+let statsMoneySaved = 0;
+
+function registerNode(docId, node) {
+    if (!docId) return;
+    if (!itemNodesByDocId[docId]) itemNodesByDocId[docId] = [];
+    itemNodesByDocId[docId].push(node);
+}
+
+function removeItemNodes(docId) {
+    (itemNodesByDocId[docId] || []).forEach((node) => {
+        node.classList.add('item-exit');
+        setTimeout(() => node.remove(), 200);
+    });
+    delete itemNodesByDocId[docId];
+}
+
+// Works out how many days are left until an expiry date, and which colour /
+// label that should show up as.
+function getUrgencyInfo(expiryDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(expiryDate);
+    target.setHours(0, 0, 0, 0);
+    const daysLeft = Math.round((target - today) / (1000 * 60 * 60 * 24));
+    const formattedDate = expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+    if (daysLeft < 0) {
+        return { daysLeft, className: 'expiry-expired', label: `Expired ${Math.abs(daysLeft)}d ago` };
+    }
+    if (daysLeft === 0) {
+        return { daysLeft, className: 'expiry-urgent', label: 'Expires today' };
+    }
+    if (daysLeft === 1) {
+        return { daysLeft, className: 'expiry-urgent', label: 'Expires tomorrow' };
+    }
+    if (daysLeft <= 3) {
+        return { daysLeft, className: 'expiry-soon', label: `Expires: ${formattedDate}` };
+    }
+    return { daysLeft, className: 'expiry-fresh', label: `Expires: ${formattedDate}` };
+}
+
+// Builds a simple "use this up today" suggestion based on the categories of
+// the soonest-expiring items. Not real recipe intelligence - just a friendly
+// nudge in the spirit of the original "what do we eat today?" idea.
+function buildEatTodaySuggestion(items) {
+    if (items.length === 0) {
+        return "✅ Nothing expiring in the next 3 days - your pantry's looking good!";
+    }
+    const topItems = items.slice(0, 2);
+    const names = topItems.map((i) => i.name).join(' & ');
+    const cats = new Set(topItems.map((i) => i.category));
+
+    let idea = "using it up before it turns";
+    if (cats.has('meat') && cats.has('produce')) {
+        idea = "a quick stir-fry";
+    } else if (cats.has('meat')) {
+        idea = "a simple pan-sear or bake";
+    } else if (cats.has('produce')) {
+        idea = "a fresh salad or smoothie";
+    } else if (cats.has('dairy') || cats.has('bakery')) {
+        idea = "a quick toastie or bake";
+    }
+    return `🍽️ Use up ${names} today - how about ${idea}?`;
+}
+
+// Refreshes the Expiring Soon panel's text/visibility based on what's
+// currently in expiringItemsInfo. Call this after any add or removal.
+function updateExpiringPanelState() {
+    eatTodaySuggestionLabel.textContent = buildEatTodaySuggestion(expiringItemsInfo);
+}
+
+function renderStatsBanner() {
+    statsCountLabel.textContent = statsItemsSaved;
+    statsMoneyLabel.textContent = Math.round(statsMoneySaved);
+}
+
+// Loads the running "items saved / money saved" totals for this account.
+function loadStats() {
+    db.collection('users').doc(currentUserId).collection('stats').doc('summary').get()
+        .then((doc) => {
+            const data = doc.data() || {};
+            statsItemsSaved = data.itemsSaved || 0;
+            statsMoneySaved = data.moneySaved || 0;
+            renderStatsBanner();
+        })
+        .catch((error) => {
+            console.error("Stats load error:", error);
+        });
+}
+
+// Called whenever an item is marked "used" instead of being left to expire.
+// Updates the running totals both on screen and in Firestore.
+function recordSavedStat(matchedKey) {
+    const value = estimatedValueMap[matchedKey] ?? estimatedValueMap.other;
+    statsItemsSaved += 1;
+    statsMoneySaved += value;
+    renderStatsBanner();
+
+    db.collection('users').doc(currentUserId).collection('stats').doc('summary').set({
+        itemsSaved: firebase.firestore.FieldValue.increment(1),
+        moneySaved: firebase.firestore.FieldValue.increment(value)
+    }, { merge: true }).catch((error) => {
+        console.error("Stats save error:", error);
+    });
+}
+
+// Deletes an item from Firestore and the screen, and counts it as "saved"
+// rather than wasted. idHolder is a small { id: ... } object so this still
+// works even if the item hasn't finished its first save to Firestore yet.
+function markItemUsed(idHolder, matchedKey) {
+    const docId = idHolder.id;
+    if (!docId || !currentUserId) {
+        alert("Still saving this item - give it a second and try again.");
+        return;
+    }
+    db.collection('users').doc(currentUserId).collection('pantryItems').doc(docId).delete()
+        .then(() => {
+            removeItemNodes(docId);
+            expiringItemsInfo = expiringItemsInfo.filter((entry) => entry.idHolder !== idHolder);
+            updateExpiringPanelState();
+            recordSavedStat(matchedKey);
+        })
+        .catch((error) => {
+            console.error("Delete error:", error);
+            alert("Couldn't remove that item - please try again.");
+        });
+}
 
 // Turns a "days from now" number into a yyyy-mm-dd string, which is the
 // format the <input type="date"> field needs.
@@ -115,6 +276,7 @@ auth.onAuthStateChanged((user) => {
         signupScreen.classList.add('hidden');
         homeScreen.classList.remove('hidden');
         loadPantryFromFirestore();
+        loadStats();
     } else {
         currentUserId = null;
         homeScreen.classList.add('hidden');
@@ -274,32 +436,66 @@ function matchCategory(categoryTag) {
     return "other";
 }
 
+// Builds one "row" for an item: name, colour-coded expiry label, and a
+// checkmark button to mark it used. Shared by both the category group and
+// the Expiring Soon panel, since an urgent item appears in both places.
+function buildFoodItemElement(name, matchedKey, urgencyInfo, idHolder) {
+    const el = document.createElement('div');
+    el.className = 'food-item';
+
+    const info = document.createElement('div');
+    info.className = 'food-item-info';
+    info.innerHTML = `<strong>${name}</strong> <span class="date ${urgencyInfo.className}">${urgencyInfo.label}</span>`;
+    el.appendChild(info);
+
+    const markUsedBtn = document.createElement('button');
+    markUsedBtn.className = 'mark-used-btn';
+    markUsedBtn.title = 'Mark as used';
+    markUsedBtn.textContent = '✓';
+    markUsedBtn.addEventListener('click', () => markItemUsed(idHolder, matchedKey));
+    el.appendChild(markUsedBtn);
+
+    return el;
+}
+
 // ============================================
 // RENDER + SAVE
-// Draws an item into its matching pantry group on screen. Unless it was
-// just loaded from the database (see loadPantryFromFirestore below), it
-// also saves the item to Firestore so it's still there next time the page
-// is opened.
+// Draws an item into its matching pantry group (and, if it's expiring
+// within 3 days, into the Expiring Soon panel too). Unless it was just
+// loaded from the database (see loadPantryFromFirestore below), it also
+// saves the item to Firestore so it's still there next time the page opens.
 // ============================================
 function addItemToPantry(name, matchedKey, saveToDatabase, existingExpiryISO, docId) {
-    let computedExpiry;
-    if (existingExpiryISO) {
-        computedExpiry = new Date(existingExpiryISO);
-    } else {
+    const computedExpiry = existingExpiryISO ? new Date(existingExpiryISO) : new Date();
+    if (!existingExpiryISO) {
         const daysToAdd = shelfLifeMap[matchedKey] ?? shelfLifeMap["other"];
-        computedExpiry = new Date();
         computedExpiry.setDate(computedExpiry.getDate() + daysToAdd);
     }
+    const urgencyInfo = getUrgencyInfo(computedExpiry);
 
-    const formattedDate = computedExpiry.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     const targetGroup = document.querySelector(`#group-${matchedKey} .items`);
     if (!targetGroup) return;
 
-    const itemMarkup = document.createElement('div');
-    itemMarkup.className = 'food-item';
-    if (docId) itemMarkup.dataset.id = docId;
-    itemMarkup.innerHTML = `<strong>${name}</strong> <span class="date">Expires: ${formattedDate}</span>`;
-    targetGroup.appendChild(itemMarkup);
+    // idHolder lets the "mark as used" button always find the right
+    // Firestore doc ID, even if it wasn't known yet at the moment this item
+    // was drawn on screen (brand new scans get their ID back a moment later).
+    const idHolder = { id: docId || null };
+
+    const itemEl = buildFoodItemElement(name, matchedKey, urgencyInfo, idHolder);
+    targetGroup.appendChild(itemEl);
+
+    let expiringEl = null;
+    if (urgencyInfo.daysLeft <= 3) {
+        expiringEl = buildFoodItemElement(name, matchedKey, urgencyInfo, idHolder);
+        expiringItemsContainer.appendChild(expiringEl);
+        expiringItemsInfo.push({ idHolder, name, category: matchedKey });
+        updateExpiringPanelState();
+    }
+
+    if (docId) {
+        registerNode(docId, itemEl);
+        if (expiringEl) registerNode(docId, expiringEl);
+    }
 
     if (saveToDatabase && currentUserId) {
         db.collection('users').doc(currentUserId).collection('pantryItems').add({
@@ -307,6 +503,10 @@ function addItemToPantry(name, matchedKey, saveToDatabase, existingExpiryISO, do
             category: matchedKey,
             expiryDate: computedExpiry.toISOString(),
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then((docRef) => {
+            idHolder.id = docRef.id;
+            registerNode(docRef.id, itemEl);
+            if (expiringEl) registerNode(docRef.id, expiringEl);
         }).catch((error) => {
             console.error("Firestore save error:", error);
         });
@@ -322,6 +522,8 @@ function loadPantryFromFirestore() {
     // Clear anything already drawn on screen first, so items don't get
     // duplicated if this ever runs twice.
     document.querySelectorAll('#pantry-groups .items').forEach((el) => (el.innerHTML = ''));
+    itemNodesByDocId = {};
+    expiringItemsInfo = [];
 
     db.collection('users').doc(currentUserId).collection('pantryItems')
         .orderBy('createdAt', 'asc')
@@ -331,6 +533,7 @@ function loadPantryFromFirestore() {
                 const item = doc.data();
                 addItemToPantry(item.name, item.category, false, item.expiryDate, doc.id);
             });
+            updateExpiringPanelState();
         })
         .catch((error) => {
             console.error("Firestore load error:", error);

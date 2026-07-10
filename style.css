@@ -21,6 +21,15 @@ body {
     box-sizing: border-box;
 }
 
+/* NEW: gentle fade + rise whenever a screen becomes visible */
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.screen:not(.hidden) {
+    animation: fadeSlideIn 0.25s ease-out;
+}
+
 /* Specific to the Login Screen */
 #login-screen,
 #signup-screen,
@@ -109,10 +118,21 @@ body {
     color: white;
 }
 
+/* NEW: banner showing the running "items saved from waste" tally */
+.stats-banner {
+    background-color: #FFF7E6;
+    color: #92400E;
+    text-align: center;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: bold;
+    border-bottom: 1px solid #FDE8C8;
+}
+
 /* --- PANTRY LIST (NEW: scrollable area holding the category groups) --- */
 #pantry-groups {
     padding: 20px;
-    height: 85vh;
+    height: calc(85vh - 45px); /* 85vh below the header, minus the stats banner's height */
     overflow-y: auto;
     box-sizing: border-box;
 }
@@ -129,6 +149,26 @@ body {
     color: var(--primary-teal);
 }
 
+/* NEW: the highlighted "Expiring Soon" panel that sits above the categories */
+.expiring-panel {
+    border-left: 5px solid var(--accent-orange);
+    background: #FFFBF0;
+    border-radius: 8px;
+    padding: 15px 15px 15px 15px;
+    margin-bottom: 25px;
+}
+
+.expiring-panel h3 {
+    color: #B45309;
+}
+
+.eat-today-text {
+    font-size: 14px;
+    color: #4B5563;
+    margin: 0 0 12px 0;
+    line-height: 1.4;
+}
+
 /* --- NEW: a single scanned item inside a category --- */
 .food-item {
     background: #FDFCF9;
@@ -137,12 +177,71 @@ body {
     border-radius: 8px;
     display: flex;
     justify-content: space-between;
+    align-items: center;
     border: 1px solid #E5E7EB;
 }
 
+.food-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* NEW: small circular "mark as used" checkmark button on each item */
+.mark-used-btn {
+    background: var(--primary-teal);
+    color: white;
+    border: none;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border-radius: 50%;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mark-used-btn:hover {
+    filter: brightness(0.92);
+}
+
 .date {
-    color: #e63946;
     font-weight: bold;
+}
+
+/* NEW: colour-coded urgency, instead of everything always being red */
+.expiry-fresh {
+    color: #059669; /* green - plenty of time */
+}
+.expiry-soon {
+    color: #D97706; /* amber - within 3 days */
+}
+.expiry-urgent {
+    color: #DC2626; /* red - today or tomorrow */
+}
+.expiry-expired {
+    color: #991B1B; /* dark red - already past its date */
+}
+
+/* NEW: pop-in when an item is added, pop-out when marked used */
+@keyframes itemPopIn {
+    from { opacity: 0; transform: scale(0.92) translateY(6px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.food-item {
+    animation: itemPopIn 0.25s ease-out;
+}
+.item-exit {
+    animation: itemPopIn 0.2s ease-in reverse;
+}
+
+/* NEW: friendly placeholder text when a list has nothing in it */
+.empty-msg {
+    color: #9CA3AF;
+    font-size: 13px;
+    font-style: italic;
 }
 
 /* --- THE LOGIC CLASSES --- */

@@ -41,13 +41,24 @@
                 <h1>My Pantry</h1>
                 <span id="logout-link" class="logout-link">Log Out</span>
             </header>
+
+            <div id="stats-banner" class="stats-banner">
+                🎉 <span id="stats-count">0</span> items saved &middot; ~$<span id="stats-money">0</span> kept out of the bin
+            </div>
+
             <div id="pantry-groups">
-                <div class="category" id="group-dairy"><h3>Dairy</h3><div class="items"></div></div>
-                <div class="category" id="group-bakery"><h3>Bakery</h3><div class="items"></div></div>
-                <div class="category" id="group-meat"><h3>Meat & Fish</h3><div class="items"></div></div>
-                <div class="category" id="group-produce"><h3>Fresh Produce</h3><div class="items"></div></div>
-                <div class="category" id="group-pantry"><h3>Dry Goods</h3><div class="items"></div></div>
-                <div class="category" id="group-other"><h3>Other</h3><div class="items"></div></div>
+                <div class="category expiring-panel" id="group-expiring">
+                    <h3>⏰ Expiring Soon</h3>
+                    <p id="eat-today-suggestion" class="eat-today-text"></p>
+                    <div class="items" id="expiring-items"></div>
+                </div>
+
+                <div class="category" id="group-dairy"><h3>🥛 Dairy</h3><div class="items"></div></div>
+                <div class="category" id="group-bakery"><h3>🍞 Bakery</h3><div class="items"></div></div>
+                <div class="category" id="group-meat"><h3>🍗 Meat & Fish</h3><div class="items"></div></div>
+                <div class="category" id="group-produce"><h3>🥦 Fresh Produce</h3><div class="items"></div></div>
+                <div class="category" id="group-pantry"><h3>🥫 Dry Goods</h3><div class="items"></div></div>
+                <div class="category" id="group-other"><h3>🍽️ Other</h3><div class="items"></div></div>
             </div>
             <button id="scan-btn" class="fab">+</button>
         </section>
